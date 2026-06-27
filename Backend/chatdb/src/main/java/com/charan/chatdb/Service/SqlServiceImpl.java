@@ -21,10 +21,14 @@ public class SqlServiceImpl implements SqlService {
         if(!isSafeQuery(sql)){
             return null;
         }
+        long start = System.nanoTime();
         List<Map<String,Object>> rows = jdbcTemplate.queryForList(sql);
+        long end = System.nanoTime();
+        long time = (end-start)/1000000;
         QueryResultResponse response = new QueryResultResponse();
         response.setRows(rows);
         response.setRowCount(rows.size());
+        response.setExecutionTime(time);
         return response;
     }
 
@@ -35,7 +39,7 @@ public class SqlServiceImpl implements SqlService {
         }
 
         String query = sql.trim().toUpperCase();
-
+        System.out.println(query);
         if(!query.startsWith("SELECT")){
             throw new IllegalArgumentException("only SELECT queries are allowed....");
         }

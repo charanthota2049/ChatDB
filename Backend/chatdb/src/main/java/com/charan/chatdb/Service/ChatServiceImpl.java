@@ -1,24 +1,26 @@
 package com.charan.chatdb.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
-
+import java.util.*;
 import org.springframework.stereotype.Service;
 
 import com.charan.chatdb.DTO.*;
-import com.charan.chatdb.Model.ChatHistory;
+import com.charan.chatdb.Model.*;
 import com.charan.chatdb.Repository.*;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class ChatServiceImpl implements ChatService {
     AiServiceImpl aiService;
     SqlServiceImpl sqlService;
     ChatHistoryRepository chatHistoryRepository;
-
-    public ChatServiceImpl( AiServiceImpl aiService,SqlServiceImpl sqlService,ChatHistoryRepository chatHistoryRepository){
+    UserRepository userRepository;
+    public ChatServiceImpl( AiServiceImpl aiService,SqlServiceImpl sqlService,ChatHistoryRepository chatHistoryRepository,UserRepository userRepository){
         this.aiService = aiService;
         this.sqlService = sqlService;
         this.chatHistoryRepository = chatHistoryRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -36,6 +38,8 @@ public class ChatServiceImpl implements ChatService {
         response.setQueryResult(rows);
 
         ChatHistory obj = new ChatHistory();
+        User user = userRepository.findById(request.getUserId()).orElse(null);
+        obj.setUser(user);
         obj.setQuestion(request.getQuestion());
         obj.setGeneratedSql(query);
         obj.setAiResponse("");
@@ -43,25 +47,39 @@ public class ChatServiceImpl implements ChatService {
         obj.setCreatedAt(LocalDateTime.now());
         obj.setRowsReturned(rows.getRowCount());
         chatHistoryRepository.save(obj);
+        System.out.println(user);
         return response;
 
     }
 
-    // @Override
-    // public List<ChatHistoryDto> getChatHistory() {
-    // }
+    @Override
+    public List<ChatHistoryDto> getChatHistory(Long id) {
+        List<ChatHistory> temp = chatHistoryRepository.findByUserId(id);
+        List<ChatHistoryDto> response = new ArrayList<>();
+        for(ChatHistory ele:temp) response.add(convertToChatHistoryDto(ele));
+        return response;
+    }
 
-    // @Override
-    // public ChatHistoryDto getChatById(Long id) {
-    // }
+    @Override
+    public ChatHistoryDto getChatById(Long id) {
+        ChatHistory temp = chatHistoryRepository.findById(id).orElse(null);
+        if(temp==null){
+            throw new RuntimeException();
+        }
+        ChatHistoryDto obj = convertToChatHistoryDto(temp);
+        return obj;
+    }
 
-    // @Override
-    // public void deleteChatById(Long id) {
-    // }
+    @Override
+    public void deleteChatById(Long id) {
+        chatHistoryRepository.deleteById(id);
+    }
 
-    // @Override
-    // public void deleteAllChats() {
-    // }
+    @Override
+    @Transactional
+    public void deleteAllChats(Long id) {
+        chatHistoryRepository.deleteAllByUserId(id);
+    }
 
     private String buildPrompt(String question) {
 
@@ -101,4 +119,15 @@ public class ChatServiceImpl implements ChatService {
             """.formatted(question);
     }
     
+    private ChatHistoryDto convertToChatHistoryDto(ChatHistory chatHistory){
+        ChatHistoryDto obj = new ChatHistoryDto();
+        obj.setId(chatHistory.getId());
+        obj.setCreatedAt(chatHistory.getCreatedAt());
+        obj.setExecutionTime(chatHistory.getExecutionTime());
+        obj.setGeneratedSql(chatHistory.getGeneratedSql());
+        obj.setQuestion(chatHistory.getQuestion());
+        obj.setRowsReturned(chatHistory.getRowsReturned());
+
+        return obj;
+    }
 }
